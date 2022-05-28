@@ -1,7 +1,7 @@
 #define M5STACK_MPU6886
 #define CALIBCOUNT 10000
-#define SPEED 107
-#define PLUS 20
+#define SPEED 92
+#define PLUS 35
 #define PIN 26
 #define NUMPIXELS 3
 #define PaHub_I2C_ADDRESS	0x70
@@ -236,7 +236,7 @@ void GetCam()
 	{
     int a = Serial2.read();
     if (a >= 0 && a <= 70) {
-      GrovalCam = a;
+      GrovalCam = a - 35;
     }
 	}
 }
@@ -311,20 +311,21 @@ void motor_stop()
 void motor(int angle)
 {
   int gyro = GetGyro();
+	GetCam();
   int plus_power = 0;
   int diff = 10;
 
-  if (gyro >= diff && gyro <= 180)
+  if (gyro >= 0 && gyro <= 35)
   {
-    plus_power = -PLUS;
+    plus_power = -GrovalCam;
   }
-  else if (gyro <= -diff && gyro >= -180)
+  else if (gyro <= 0 && gyro >= -35)
   {
-    plus_power = PLUS;
+    plus_power = -GrovalCam;
   }
   else
   {
-    plus_power = 0;
+    plus_power = PLUS;
   }
 
   double motor_power[4];
@@ -460,7 +461,7 @@ void Main()
     }
     else
     {
-       int IR = /*aveIR();*/0;
+       int IR = aveIR();
 			 if(IR == 0 || IR == 5 || IR == 355)
 			 {
 	       motor(0);
@@ -469,19 +470,19 @@ void Main()
 			 {
 	        if (IR <= 90)
 					{
-	           motor(IR + 20);
+	           motor(IR + 30);
 	        }
 	        else if(IR > 90 && IR <= 180)
 					{
-	           motor(IR + 50);
+	           motor(IR + 60);
 	        }
 	        else if(IR > 180 && IR <= 270)
 					{
-	           motor(IR - 50);
+	           motor(IR - 60);
 	        }
 	        else if(IR > 270)
 					{
-	           motor(IR - 20);
+	           motor(IR - 30);
 	        }
 	     }
      }
