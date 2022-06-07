@@ -15,6 +15,9 @@
 #include "ClosedCube_TCA9548A.h"
 #include <LovyanGFX.hpp>
 #include <LGFX_AUTODETECT.hpp>
+#include <MadgwickAHRS.h>
+
+Madgwick MadgwickFilter;
 
 static LGFX lcd;
 static LGFX_Sprite canvas(&lcd);
@@ -94,29 +97,46 @@ void calibration()
   delay(500);
 }
 
+// int GetGyro()
+// {
+//   M5.IMU.getGyroData(&gyroX, &gyroY, &gyroZ);
+//   M5.IMU.getAccelData(&accX, &accY, &accZ);
+//
+//   gyroZ -= gyroOffsetZ;
+//
+//   dt = (micros() - preTime) / 1000000;
+//   preTime = micros();
+//
+//   yaw -= (pregz + gyroZ) * dt / 2;
+//   pregz = gyroZ;
+//
+//   if (yaw > 180)
+//   {
+//     yaw -= 360;
+//   }
+//   else if (yaw < -180)
+//   {
+//     yaw += 360;
+//   }
+//   return (int)yaw;
+//   delay(10);
+// }
+
 int GetGyro()
 {
-  M5.IMU.getGyroData(&gyroX, &gyroY, &gyroZ);
-  M5.IMU.getAccelData(&accX, &accY, &accZ);
-
-  gyroZ -= gyroOffsetZ;
-
-  dt = (micros() - preTime) / 1000000;
-  preTime = micros();
-
-  yaw -= (pregz + gyroZ) * dt / 2;
-  pregz = gyroZ;
-
-  if (yaw > 180)
-  {
-    yaw -= 360;
-  }
-  else if (yaw < -180)
-  {
-    yaw += 360;
-  }
-  return (int)yaw;
-  delay(10);
+	M5.IMU.getGyroData(&gyroX, &gyroY, &gyroZ);
+	M5.IMU.getAccelData(&accX, &accY, &accZ);
+	MadgwickFilter.updateIMU(gyroX, gyroY, gyroZ, accX, accY, accZ);
+	yaw = MadgwickFilter.getYaw();
+	if (yaw > 180)
+	{
+	  yaw -= 360;
+	}
+	else if (yaw < -180)
+	{
+	  yaw += 360;
+	}
+	return (int)yaw;
 }
 
 int GetIRval(int f) {
@@ -501,6 +521,7 @@ void setup() {
   tcs.setIntegrationTime(TCS34725_INTEGRATIONTIME_2_4MS);
   tcs.setGain(TCS34725_GAIN_16X);
   M5.IMU.Init();
+	MadgwickFilter.begin(100);
   base_x.SetMode(1, NORMAL_MODE);
   base_x.SetMode(2, NORMAL_MODE);
   base_x.SetMode(3, NORMAL_MODE);
