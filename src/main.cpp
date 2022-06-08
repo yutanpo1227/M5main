@@ -1,5 +1,5 @@
 #define M5STACK_MPU6886
-#define CALIBCOUNT 10000
+#define CALIBCOUNT 100
 #define SPEED 92
 #define PLUS 35
 #define PIN 26
@@ -39,6 +39,7 @@ float gyroZ = 0.0F;
 float yaw   = 0.0F;
 
 float gyroOffsetZ = 1.021;
+float accOffsetZ = 0;
 
 float preTime = 0.0F;
 float dt = 0.0F;
@@ -71,15 +72,19 @@ void calibration()
 {
   delay(1000);
   M5.Lcd.printf("...");
-  float gyroSumZ = 0;
+	gyroOffsetZ = 0;
+	accOffsetZ = 0;
   int count = CALIBCOUNT;
   for (int i = 0; i < count; i++) {
     M5.update();
 
     float gyroZ;
+		float accZ;
     M5.IMU.getGyroData(&gyroX, &gyroY, &gyroZ);
+		M5.IMU.getAccelData(&accX, &accY, &accZ);
 
-    gyroSumZ += gyroZ;
+    gyroOffsetZ += gyroZ/count;
+		accOffsetZ += accZ/count;
     if (M5.BtnB.wasPressed())
     {
       M5.Lcd.clear();
@@ -89,12 +94,12 @@ void calibration()
       return;
     }
   }
-  gyroOffsetZ = gyroSumZ / count - 0.02;
   M5.Lcd.clear();
   M5.Lcd.setCursor(140, 120);
-  M5.Lcd.printf("Done");
+  //M5.Lcd.printf("Done");
+	M5.Lcd.printf("%d",accOffsetZ);
 	M5.update();
-  delay(500);
+  delay(5000);
 }
 
 // int GetGyro()
@@ -126,8 +131,10 @@ int GetGyro()
 {
 	M5.IMU.getGyroData(&gyroX, &gyroY, &gyroZ);
 	M5.IMU.getAccelData(&accX, &accY, &accZ);
+	gyroZ -= gyroOffsetZ;
+	accZ -= accOffsetZ;
 	MadgwickFilter.updateIMU(gyroX, gyroY, gyroZ, accX, accY, accZ);
-	yaw = MadgwickFilter.getYaw();
+	yaw = MadgwickFilter.getYaw() - 180;
 	if (yaw > 180)
 	{
 	  yaw -= 360;
@@ -236,9 +243,12 @@ void Button1()
 void ResetGyro()
 {
 	M5.update();
-  gyroZ = 0.0;
-  pregz = 0.0;
-  yaw = 0.0;
+	for(int i = 0; i < 10;i++)
+	{
+  	gyroZ = 0.0;
+		accZ = 0.0;
+  	yaw = 0.0;
+	}
   M5.Lcd.clear();
   M5.Lcd.setCursor(120, 120);
   M5.Lcd.printf("RESET");
