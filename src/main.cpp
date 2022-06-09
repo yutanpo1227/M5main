@@ -1,5 +1,5 @@
 #define M5STACK_MPU6886
-#define CALIBCOUNT 10000
+#define CALIBCOUNT 100
 #define SPEED 92
 #define PLUS 35
 #define PIN 26
@@ -10,12 +10,17 @@
 
 #include <M5Stack.h>
 #include <Adafruit_NeoPixel.h>
-#include "BaseX.h"
 #include "Adafruit_TCS34725.h"
 #include "ClosedCube_TCA9548A.h"
 #include <LovyanGFX.hpp>
 #include <LGFX_AUTODETECT.hpp>
 #include <MadgwickAHRS.h>
+#include <CytronMotorDriver.h>
+
+CytronMD motor1(PWM_PWM,19,18);
+CytronMD motor2(PWM_PWM,17,16);
+CytronMD motor3(PWM_PWM,25,26);
+CytronMD motor4(PWM_PWM,3,1);
 
 Madgwick MadgwickFilter;
 
@@ -24,7 +29,6 @@ static LGFX_Sprite canvas(&lcd);
 
 ClosedCube::Wired::TCA9548A tca9548a;
 
-BASE_X base_x = BASE_X();
 Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
@@ -39,6 +43,7 @@ float gyroZ = 0.0F;
 float yaw   = 0.0F;
 
 float gyroOffsetZ = 1.021;
+float accOffsetZ = 0;
 
 float preTime = 0.0F;
 float dt = 0.0F;
@@ -71,15 +76,19 @@ void calibration()
 {
   delay(1000);
   M5.Lcd.printf("...");
-  float gyroSumZ = 0;
+	gyroOffsetZ = 0;
+	accOffsetZ = 0;
   int count = CALIBCOUNT;
   for (int i = 0; i < count; i++) {
     M5.update();
 
     float gyroZ;
+		float accZ;
     M5.IMU.getGyroData(&gyroX, &gyroY, &gyroZ);
+		M5.IMU.getAccelData(&accX, &accY, &accZ);
 
-    gyroSumZ += gyroZ;
+    gyroOffsetZ += gyroZ/count;
+		accOffsetZ += accZ/count;
     if (M5.BtnB.wasPressed())
     {
       M5.Lcd.clear();
@@ -89,12 +98,12 @@ void calibration()
       return;
     }
   }
-  gyroOffsetZ = gyroSumZ / count - 0.02;
   M5.Lcd.clear();
   M5.Lcd.setCursor(140, 120);
-  M5.Lcd.printf("Done");
+  //M5.Lcd.printf("Done");
+	M5.Lcd.printf("%d",accOffsetZ);
 	M5.update();
-  delay(500);
+  delay(5000);
 }
 
 // int GetGyro()
@@ -126,8 +135,10 @@ int GetGyro()
 {
 	M5.IMU.getGyroData(&gyroX, &gyroY, &gyroZ);
 	M5.IMU.getAccelData(&accX, &accY, &accZ);
+	gyroZ -= gyroOffsetZ;
+	accZ -= accOffsetZ;
 	MadgwickFilter.updateIMU(gyroX, gyroY, gyroZ, accX, accY, accZ);
-	yaw = MadgwickFilter.getYaw();
+	yaw = MadgwickFilter.getYaw() - 180;
 	if (yaw > 180)
 	{
 	  yaw -= 360;
@@ -236,9 +247,12 @@ void Button1()
 void ResetGyro()
 {
 	M5.update();
-  gyroZ = 0.0;
-  pregz = 0.0;
-  yaw = 0.0;
+	for(int i = 0; i < 10;i++)
+	{
+  	gyroZ = 0.0;
+		accZ = 0.0;
+  	yaw = 0.0;
+	}
   M5.Lcd.clear();
   M5.Lcd.setCursor(120, 120);
   M5.Lcd.printf("RESET");
@@ -303,28 +317,28 @@ void DrawGyro()
 
 void TurnRight(int power)
 {
-  base_x.SetMotorSpeed(1, power);
-  base_x.SetMotorSpeed(2, power);
-  base_x.SetMotorSpeed(3, power);
-  base_x.SetMotorSpeed(4, power);
+  motor1.setSpeed(power);
+  motor2.setSpeed(power);
+  motor3.setSpeed(power);
+  motor4.setSpeed(power);
   delay(1);
 }
 
 void TurnLeft(int power)
 {
-  base_x.SetMotorSpeed(1, -power);
-  base_x.SetMotorSpeed(2, -power);
-  base_x.SetMotorSpeed(3, -power);
-  base_x.SetMotorSpeed(4, -power);
+  motor1.setSpeed(-power);
+  motor2.setSpeed(-power);
+  motor3.setSpeed(-power);
+  motor4.setSpeed(-power);
   delay(1);
 }
 
 void motor_stop()
 {
-  base_x.SetMotorSpeed(1, 0);
-  base_x.SetMotorSpeed(2, 0);
-  base_x.SetMotorSpeed(3, 0);
-  base_x.SetMotorSpeed(4, 0);
+  motor1.setSpeed(0);
+  motor2.setSpeed(0);
+  motor3.setSpeed(0);
+  motor4.setSpeed(0);
   delay(1);
 }
 
@@ -380,10 +394,10 @@ void motor(int angle)
     // motor_power[i] = ave_mpPlus / num;
   }
 
-  base_x.SetMotorSpeed(1, (int)motor_power[0]);
-  base_x.SetMotorSpeed(2, (int)motor_power[1]);
-  base_x.SetMotorSpeed(3, (int)motor_power[2]);
-  base_x.SetMotorSpeed(4, (int)motor_power[3]);
+  motor1.setSpeed((int)motor_power[0]);
+  motor2.setSpeed((int)motor_power[1]);
+  motor3.setSpeed((int)motor_power[2]);
+  motor4.setSpeed((int)motor_power[3]);
   delay(1);
 }
 
